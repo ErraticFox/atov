@@ -1,0 +1,20 @@
+{
+  "name": "atoz-auto",
+  "version": "1.0.0",
+  "description": "Chrome extension for automating VTO and VET on Amazon A-to-Z portal",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  },
+  "keywords": [
+    "chrome-extension",
+    "amazon",
+    "atoz",
+    "vto",
+    "vet"
+  ],
+  "license": "MIT"
+}

@@ -47,7 +47,7 @@ coverage/
 # Don't ignore manifest.json - it's required!
 # Don't ignore icons/ - they're required!
 
-# Agents
+# Claude/AI settings
 AGENTS.md
 CLAUDE.md
-settings.local.json
+.claude/settings.local.json

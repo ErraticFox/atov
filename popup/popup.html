@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A-to-Z Auto</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>A-to-Z Auto</h1>
+
+    <div id="not-supported" class="page-section hidden">
+      <p class="message">Navigate to a supported A-to-Z page to use this extension.</p>
+    </div>
+
+    <div id="vto-section" class="page-section hidden">
+      <h2>VTO - Voluntary Time Off</h2>
+      <div class="form-group">
+        <label for="vto-date">Date(s)</label>
+        <input type="date" id="vto-date" multiple>
+      </div>
+      <div class="form-group">
+        <label for="vto-time">Time</label>
+        <input type="time" id="vto-time">
+      </div>
+      <div class="controls">
+        <button id="vto-start" class="btn btn-start">Start</button>
+        <button id="vto-stop" class="btn btn-stop" disabled>Stop</button>
+      </div>
+      <div id="vto-status" class="status"></div>
+    </div>
+
+    <div id="vet-section" class="page-section hidden">
+      <h2>VET - Voluntary Extra Time</h2>
+      <div class="form-group">
+        <label for="vet-date">Date(s)</label>
+        <input type="date" id="vet-date" multiple>
+      </div>
+      <div class="form-group">
+        <label for="vet-time">Time</label>
+        <input type="time" id="vet-time">
+      </div>
+      <div class="controls">
+        <button id="vet-start" class="btn btn-start">Start</button>
+        <button id="vet-stop" class="btn btn-stop" disabled>Stop</button>
+      </div>
+      <div id="vet-status" class="status"></div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

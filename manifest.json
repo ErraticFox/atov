@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "A-to-Z Auto",
+  "version": "1.0.0",
+  "description": "Automate VTO and VET interactions on Amazon A-to-Z portal",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://atoz.amazon.work/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://atoz.amazon.work/voluntary_time_off*",
+        "https://atoz.amazon.work/shifts/schedule/find*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}
