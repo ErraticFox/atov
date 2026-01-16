@@ -56,6 +56,8 @@ function createVtoTargetEntry(data = {}) {
   entry.className = 'vto-target-entry';
   entry.dataset.id = vtoTargetCount;
 
+  const isFullShift = data.fullShift || false;
+
   entry.innerHTML = `
     <div class="vto-target-header">
       <span class="vto-target-num">Target #${vtoTargetCount}</span>
@@ -66,7 +68,13 @@ function createVtoTargetEntry(data = {}) {
         <label>Date (optional)</label>
         <input type="date" class="vto-date" value="${data.date || ''}">
       </div>
-      <div class="vto-time-row">
+      <div class="vto-fullshift-row">
+        <label class="checkbox-label">
+          <input type="checkbox" class="vto-fullshift" ${isFullShift ? 'checked' : ''}>
+          <span>Full Shift</span>
+        </label>
+      </div>
+      <div class="vto-time-row ${isFullShift ? 'hidden' : ''}">
         <div class="form-group">
           <label>Start Time</label>
           <input type="time" class="vto-start" value="${data.startTime || ''}">
@@ -86,9 +94,23 @@ function createVtoTargetEntry(data = {}) {
     saveVtoTargets();
   });
 
+  // Full shift checkbox toggle
+  const fullShiftCheckbox = entry.querySelector('.vto-fullshift');
+  const timeRow = entry.querySelector('.vto-time-row');
+  fullShiftCheckbox.addEventListener('change', () => {
+    if (fullShiftCheckbox.checked) {
+      timeRow.classList.add('hidden');
+    } else {
+      timeRow.classList.remove('hidden');
+    }
+    saveVtoTargets();
+  });
+
   // Auto-save on input change
   entry.querySelectorAll('input').forEach(input => {
-    input.addEventListener('change', () => saveVtoTargets());
+    if (!input.classList.contains('vto-fullshift')) {
+      input.addEventListener('change', () => saveVtoTargets());
+    }
   });
 
   return entry;
@@ -105,19 +127,41 @@ function renumberVtoTargets() {
 }
 
 /**
+ * Get shift time settings
+ */
+function getShiftTime() {
+  return {
+    start: document.getElementById('shift-start').value,
+    end: document.getElementById('shift-end').value
+  };
+}
+
+/**
  * Get all VTO targets from the form (includes partial entries for saving)
  */
-function getVtoTargets(includePartial = false) {
+function getVtoTargets(includePartial = false, resolveFullShift = false) {
   const entries = document.querySelectorAll('.vto-target-entry');
   const targets = [];
+  const shiftTime = getShiftTime();
 
   entries.forEach(entry => {
     const date = entry.querySelector('.vto-date').value;
-    const startTime = entry.querySelector('.vto-start').value;
-    const endTime = entry.querySelector('.vto-end').value;
+    const fullShift = entry.querySelector('.vto-fullshift').checked;
+    let startTime = entry.querySelector('.vto-start').value;
+    let endTime = entry.querySelector('.vto-end').value;
 
-    if (includePartial || (startTime && endTime)) {
-      targets.push({ date, startTime, endTime });
+    // If full shift is checked and we're resolving, use shift times
+    if (fullShift && resolveFullShift) {
+      startTime = shiftTime.start;
+      endTime = shiftTime.end;
+    }
+
+    if (includePartial) {
+      targets.push({ date, startTime, endTime, fullShift });
+    } else if (fullShift && shiftTime.start && shiftTime.end) {
+      targets.push({ date, startTime, endTime, fullShift });
+    } else if (!fullShift && startTime && endTime) {
+      targets.push({ date, startTime, endTime, fullShift });
     }
   });
 
@@ -125,29 +169,51 @@ function getVtoTargets(includePartial = false) {
 }
 
 /**
- * Save VTO targets to local storage
+ * Save VTO targets and shift time to local storage
  */
 async function saveVtoTargets() {
   const targets = getVtoTargets(true);
+  const shiftTime = getShiftTime();
   const result = await chrome.storage.local.get('vto');
   const existing = result.vto || {};
   await chrome.storage.local.set({
-    vto: { ...existing, targets }
+    vto: { ...existing, targets, shiftTime }
+  });
+}
+
+/**
+ * Save shift time to local storage
+ */
+async function saveShiftTime() {
+  const shiftTime = getShiftTime();
+  const result = await chrome.storage.local.get('vto');
+  const existing = result.vto || {};
+  await chrome.storage.local.set({
+    vto: { ...existing, shiftTime }
   });
 }
 
 async function startAutomation(pageType) {
   if (pageType === PageType.VTO) {
-    const targets = getVtoTargets();
+    const targets = getVtoTargets(false, true); // resolve full shift times
+    const shiftTime = getShiftTime();
 
     if (targets.length === 0) {
       alert('Please add at least one VTO target with start and end times');
       return;
     }
 
+    // Check if any full shift target but no shift time set
+    const hasFullShift = targets.some(t => t.fullShift);
+    if (hasFullShift && (!shiftTime.start || !shiftTime.end)) {
+      alert('Please set your shift time to use Full Shift targets');
+      return;
+    }
+
     const config = {
       pageType: pageType,
       targets: targets,
+      shiftTime: shiftTime,
       isRunning: true
     };
 
@@ -195,14 +261,23 @@ async function loadSavedState(pageType) {
   const config = result[pageType];
 
   if (config) {
-    if (pageType === PageType.VTO && config.targets) {
-      const list = document.getElementById('vto-targets-list');
-      config.targets.forEach(target => {
-        list.appendChild(createVtoTargetEntry(target));
-      });
+    if (pageType === PageType.VTO) {
+      // Load shift time
+      if (config.shiftTime) {
+        document.getElementById('shift-start').value = config.shiftTime.start || '';
+        document.getElementById('shift-end').value = config.shiftTime.end || '';
+      }
 
-      if (config.isRunning) {
-        updateStatus(pageType, true, config.targets.length);
+      // Load targets
+      if (config.targets) {
+        const list = document.getElementById('vto-targets-list');
+        config.targets.forEach(target => {
+          list.appendChild(createVtoTargetEntry(target));
+        });
+
+        if (config.isRunning) {
+          updateStatus(pageType, true, config.targets.length);
+        }
       }
     } else {
       if (config.date) {
@@ -237,6 +312,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Event listeners
+  document.getElementById('shift-start').addEventListener('change', () => saveShiftTime());
+  document.getElementById('shift-end').addEventListener('change', () => saveShiftTime());
+
   document.getElementById('vto-add-target').addEventListener('click', () => {
     document.getElementById('vto-targets-list').appendChild(createVtoTargetEntry());
     saveVtoTargets();
