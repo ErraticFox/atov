@@ -12,8 +12,9 @@ body {
 }
 
 .container {
-  width: 300px;
+  width: 320px;
   padding: 16px;
+  overflow: hidden;
 }
 
 h1 {
@@ -42,23 +43,23 @@ h2 {
 }
 
 .form-group {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .form-group label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: #545b64;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .form-group input {
   width: 100%;
-  padding: 8px;
+  padding: 6px 8px;
   border: 1px solid #d5d9d9;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .form-group input:focus {
@@ -107,6 +108,19 @@ h2 {
   background: #b02a0f;
 }
 
+.btn-add {
+  width: 100%;
+  background: #f0f0f0;
+  color: #545b64;
+  margin-top: 8px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.btn-add:hover {
+  background: #e0e0e0;
+}
+
 .status {
   margin-top: 12px;
   padding: 8px;
@@ -146,109 +160,64 @@ h2 {
   margin-bottom: 12px;
 }
 
-.vto-slots-container {
-  max-height: 280px;
-  overflow-y: auto;
-  margin-bottom: 12px;
-}
-
-.vto-date-group {
+/* VTO Target Entry */
+.vto-target-entry {
+  background: #f5f7f9;
+  border-radius: 6px;
+  padding: 10px;
   margin-bottom: 8px;
+  border-left: 3px solid #ff9900;
 }
 
-.vto-date-header {
+.vto-target-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  cursor: pointer;
-  user-select: none;
+  margin-bottom: 8px;
 }
 
-.vto-date-text {
-  font-size: 14px;
+.vto-target-num {
+  font-size: 11px;
   font-weight: 600;
-  color: #232f3e;
-}
-
-.vto-chevron {
-  font-size: 10px;
   color: #545b64;
-  transition: transform 0.2s;
 }
 
-.vto-date-header[data-expanded="false"] .vto-chevron {
-  transform: rotate(180deg);
+.vto-target-remove {
+  background: none;
+  border: none;
+  color: #d13212;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
 }
 
-.vto-date-slots {
+.vto-target-remove:hover {
+  color: #b02a0f;
+}
+
+.vto-target-fields {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.vto-date-header[data-expanded="false"] + .vto-date-slots {
-  display: none;
+.vto-target-fields .form-group {
+  margin-bottom: 0;
 }
 
-.vto-slot-card {
-  background: #e8eaed;
-  border-radius: 4px;
-  padding: 10px 12px;
-  border-left: 3px solid #545b64;
-}
-
-.vto-slot-available {
-  border-left-color: #1d8102;
+.vto-target-fields .form-group input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px;
 }
 
 .vto-time-row {
   display: flex;
-  align-items: baseline;
   gap: 6px;
-  margin-bottom: 2px;
 }
 
-.vto-time-range {
-  font-size: 13px;
-  font-weight: 600;
-  color: #232f3e;
-}
-
-.vto-duration {
-  font-size: 12px;
-  color: #545b64;
-}
-
-.dur-hours {
-  color: #0073bb;
-}
-
-.dur-mins {
-  color: #d13212;
-}
-
-.vto-sort-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: #545b64;
-  margin-bottom: 4px;
-}
-
-.vto-status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: #687078;
-}
-
-.vto-filled-icon {
-  font-size: 12px;
-}
-
-.vto-controls-section {
-  border-top: 1px solid #d5d9d9;
-  padding-top: 12px;
-  margin-top: 8px;
+.vto-time-row .form-group {
+  flex: 1;
+  min-width: 0;
 }

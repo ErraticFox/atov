@@ -2,6 +2,7 @@
 
 let isRunning = false;
 let config = null;
+let refreshInterval = null;
 
 function getPageType() {
   const url = window.location.href;
@@ -10,43 +11,140 @@ function getPageType() {
   return null;
 }
 
-function findTargetElement() {
-  // TODO: Implement actual element detection based on page structure
-  // This is a placeholder - update selectors based on actual A-to-Z DOM
-  const pageType = getPageType();
+/**
+ * Convert 24h time string (HH:MM) to 12h format for matching
+ */
+function to12Hour(time24) {
+  if (!time24) return '';
+  const [hours, mins] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'pm' : 'am';
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${mins.toString().padStart(2, '0')}${period}`;
+}
 
-  if (pageType === 'vto') {
-    // Look for VTO opportunity elements
-    const elements = document.querySelectorAll('[data-testid="vto-opportunity"], .vto-card, button[contains="Accept"]');
-    return elements.length > 0 ? elements[0] : null;
-  } else if (pageType === 'vet') {
-    // Look for VET shift elements
-    const elements = document.querySelectorAll('[data-testid="vet-shift"], .shift-card, button[contains="Pick Up"]');
-    return elements.length > 0 ? elements[0] : null;
+/**
+ * Parse a date string (YYYY-MM-DD) to match page date format (e.g., "Fri, Jan 16")
+ */
+function formatDateForMatch(dateStr) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr + 'T00:00:00');
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * Check if a VTO slot matches a target time range
+ */
+function matchesTimeRange(slotTimeRange, targetStart, targetEnd) {
+  if (!slotTimeRange || !targetStart || !targetEnd) return false;
+
+  const targetStart12 = to12Hour(targetStart).toLowerCase();
+  const targetEnd12 = to12Hour(targetEnd).toLowerCase();
+  const slotLower = slotTimeRange.toLowerCase();
+
+  // Check if both start and end times appear in the slot
+  return slotLower.includes(targetStart12.replace(':00', ':00').replace(':0', ':')) &&
+    slotLower.includes(targetEnd12.replace(':00', ':00').replace(':0', ':'));
+}
+
+/**
+ * Find a VTO slot that matches any of the user's targets
+ * @returns {Element|null} The accept button element if found
+ */
+function findMatchingVtoSlot() {
+  if (!config || !config.targets || config.targets.length === 0) return null;
+
+  const pageType = getPageType();
+  if (pageType !== 'vto') return null;
+
+  // Find all date groups (expanders)
+  const expanders = document.querySelectorAll('[data-test-component="StencilExpander"]');
+
+  for (const expander of expanders) {
+    // Get the date header
+    const dateHeader = expander.querySelector('[data-test-component="StencilH2"]');
+    const dateText = dateHeader?.textContent?.trim() || '';
+
+    // Find all VTO cards within this date group
+    const cards = expander.querySelectorAll('[data-test-component="StencilReactCard"]');
+
+    for (const card of cards) {
+      // Get the time range text from the card
+      const textElements = card.querySelectorAll('[data-test-component="StencilText"]');
+      let timeRange = '';
+
+      for (const el of textElements) {
+        const text = el.textContent.trim();
+        if (text.includes(' - ') && (text.includes('am') || text.includes('pm'))) {
+          timeRange = text;
+          break;
+        }
+      }
+
+      // Check against each target
+      for (const target of config.targets) {
+        // Check date match (if date is specified)
+        if (target.date) {
+          const targetDateStr = formatDateForMatch(target.date);
+          if (!dateText.includes(targetDateStr)) {
+            continue; // Date doesn't match, try next target
+          }
+        }
+
+        // Check time match
+        if (matchesTimeRange(timeRange, target.startTime, target.endTime)) {
+          // Find the Accept button using aria-label
+          const acceptButton = card.querySelector('button[aria-label^="Accept"]');
+
+          if (acceptButton) {
+            console.log('[A-to-Z Auto] Found matching VTO:', dateText, timeRange);
+            return acceptButton;
+          } else {
+            console.log('[A-to-Z Auto] Found matching slot but no accept button:', dateText, timeRange);
+          }
+        }
+      }
+    }
   }
 
   return null;
 }
 
-function matchesDateTimeFilter(element) {
-  if (!config || !config.date || !config.time) return true;
-
-  // TODO: Implement date/time matching based on element content
-  // This is a placeholder - parse element text to extract date/time
-  return true;
+/**
+ * Check if the confirmation dialog is open and click Accept VTO
+ * @returns {boolean} True if dialog was found and clicked
+ */
+function handleConfirmationDialog() {
+  const confirmButton = document.querySelector('button[data-test-id="VtoSummaryModal_acceptButton"]');
+  if (confirmButton) {
+    console.log('[A-to-Z Auto] Clicking confirmation dialog Accept VTO button...');
+    confirmButton.click();
+    return true;
+  }
+  return false;
 }
 
 function checkAndClick() {
   if (!isRunning) return;
 
-  const element = findTargetElement();
-
-  if (element && matchesDateTimeFilter(element)) {
-    console.log('[A-to-Z Auto] Found target element, clicking...');
-    element.click();
+  // First check if confirmation dialog is open
+  if (handleConfirmationDialog()) {
+    console.log('[A-to-Z Auto] VTO accepted! Stopping automation...');
     stopAutomation();
+    return;
+  }
+
+  // Otherwise look for a matching VTO slot
+  const acceptButton = findMatchingVtoSlot();
+
+  if (acceptButton) {
+    console.log('[A-to-Z Auto] Clicking Accept on matching VTO slot...');
+    acceptButton.click();
+    // Wait for dialog to appear, then check again
+    setTimeout(() => checkAndClick(), 500);
   } else {
-    console.log('[A-to-Z Auto] Target element not found, will refresh...');
+    console.log('[A-to-Z Auto] No matching VTO found, will refresh...');
   }
 }
 
@@ -54,26 +152,33 @@ function startAutomation(newConfig) {
   config = newConfig;
   isRunning = true;
 
-  chrome.runtime.sendMessage({ action: 'startAlarm' });
-
+  // Check immediately
   checkAndClick();
 
-  console.log('[A-to-Z Auto] Automation started');
+  // Set up 2-second refresh interval
+  if (!refreshInterval) {
+    refreshInterval = setInterval(() => {
+      if (isRunning) {
+        console.log('[A-to-Z Auto] Refreshing page...');
+        window.location.reload();
+      }
+    }, 2000);
+  }
+
+  const targetCount = config.targets?.length || 1;
+  console.log(`[A-to-Z Auto] Started - watching ${targetCount} VTO target(s)`);
 }
 
 function stopAutomation() {
   isRunning = false;
   config = null;
 
-  chrome.runtime.sendMessage({ action: 'stopAlarm' });
-
-  console.log('[A-to-Z Auto] Automation stopped');
-}
-
-function refreshPage() {
-  if (isRunning) {
-    window.location.reload();
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
   }
+
+  console.log('[A-to-Z Auto] Stopped');
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -83,14 +188,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'stop') {
     stopAutomation();
     sendResponse({ success: true });
-  } else if (message.action === 'refresh') {
-    refreshPage();
-    sendResponse({ success: true });
   }
   return true;
 });
 
-// Restore state on page load
+// Restore state on page load (with delay for SPA)
 async function restoreState() {
   const pageType = getPageType();
   if (!pageType) return;
@@ -99,8 +201,9 @@ async function restoreState() {
   const savedConfig = result[pageType];
 
   if (savedConfig && savedConfig.isRunning) {
+    console.log('[A-to-Z Auto] Restoring automation...');
     startAutomation(savedConfig);
   }
 }
 
-restoreState();
+setTimeout(() => restoreState(), 1000);

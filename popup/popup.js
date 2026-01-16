@@ -6,6 +6,8 @@ const PageType = {
   UNKNOWN: 'unknown'
 };
 
+let vtoTargetCount = 0;
+
 function detectPageType(url) {
   if (!url) return PageType.UNKNOWN;
   if (url.includes('atoz.amazon.work/voluntary_time_off')) return PageType.VTO;
@@ -27,13 +29,13 @@ function showSection(pageType) {
   }
 }
 
-function updateStatus(pageType, isRunning) {
+function updateStatus(pageType, isRunning, targetCount = 0) {
   const statusEl = document.getElementById(`${pageType}-status`);
   const startBtn = document.getElementById(`${pageType}-start`);
   const stopBtn = document.getElementById(`${pageType}-stop`);
 
   if (isRunning) {
-    statusEl.textContent = 'Running...';
+    statusEl.textContent = `Running... Checking ${targetCount} target(s) every 2 sec`;
     statusEl.className = 'status running';
     startBtn.disabled = true;
     stopBtn.disabled = false;
@@ -45,23 +47,116 @@ function updateStatus(pageType, isRunning) {
   }
 }
 
+/**
+ * Create a new VTO target entry element
+ */
+function createVtoTargetEntry(data = {}) {
+  vtoTargetCount++;
+  const entry = document.createElement('div');
+  entry.className = 'vto-target-entry';
+  entry.dataset.id = vtoTargetCount;
+
+  entry.innerHTML = `
+    <div class="vto-target-header">
+      <span class="vto-target-num">Target #${vtoTargetCount}</span>
+      <button class="vto-target-remove" title="Remove">×</button>
+    </div>
+    <div class="vto-target-fields">
+      <div class="form-group">
+        <label>Date (optional)</label>
+        <input type="date" class="vto-date" value="${data.date || ''}">
+      </div>
+      <div class="vto-time-row">
+        <div class="form-group">
+          <label>Start Time</label>
+          <input type="time" class="vto-start" value="${data.startTime || ''}">
+        </div>
+        <div class="form-group">
+          <label>End Time</label>
+          <input type="time" class="vto-end" value="${data.endTime || ''}">
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add remove handler
+  entry.querySelector('.vto-target-remove').addEventListener('click', () => {
+    entry.remove();
+    renumberVtoTargets();
+  });
+
+  return entry;
+}
+
+/**
+ * Renumber VTO targets after removal
+ */
+function renumberVtoTargets() {
+  const entries = document.querySelectorAll('.vto-target-entry');
+  entries.forEach((entry, index) => {
+    entry.querySelector('.vto-target-num').textContent = `Target #${index + 1}`;
+  });
+}
+
+/**
+ * Get all VTO targets from the form
+ */
+function getVtoTargets() {
+  const entries = document.querySelectorAll('.vto-target-entry');
+  const targets = [];
+
+  entries.forEach(entry => {
+    const date = entry.querySelector('.vto-date').value;
+    const startTime = entry.querySelector('.vto-start').value;
+    const endTime = entry.querySelector('.vto-end').value;
+
+    if (startTime && endTime) {
+      targets.push({ date, startTime, endTime });
+    }
+  });
+
+  return targets;
+}
+
 async function startAutomation(pageType) {
-  const dateInput = document.getElementById(`${pageType}-date`);
-  const timeInput = document.getElementById(`${pageType}-time`);
+  if (pageType === PageType.VTO) {
+    const targets = getVtoTargets();
 
-  const config = {
-    pageType: pageType,
-    date: dateInput.value,
-    time: timeInput.value,
-    isRunning: true
-  };
+    if (targets.length === 0) {
+      alert('Please add at least one VTO target with start and end times');
+      return;
+    }
 
-  await chrome.storage.local.set({ [pageType]: config });
+    const config = {
+      pageType: pageType,
+      targets: targets,
+      isRunning: true
+    };
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+    await chrome.storage.local.set({ [pageType]: config });
 
-  updateStatus(pageType, true);
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+
+    updateStatus(pageType, true, targets.length);
+  } else {
+    const dateInput = document.getElementById(`${pageType}-date`);
+    const timeInput = document.getElementById(`${pageType}-time`);
+
+    const config = {
+      pageType: pageType,
+      date: dateInput.value,
+      time: timeInput.value,
+      isRunning: true
+    };
+
+    await chrome.storage.local.set({ [pageType]: config });
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+
+    updateStatus(pageType, true, 1);
+  }
 }
 
 async function stopAutomation(pageType) {
@@ -79,14 +174,25 @@ async function loadSavedState(pageType) {
   const config = result[pageType];
 
   if (config) {
-    if (config.date) {
-      document.getElementById(`${pageType}-date`).value = config.date;
-    }
-    if (config.time) {
-      document.getElementById(`${pageType}-time`).value = config.time;
-    }
-    if (config.isRunning) {
-      updateStatus(pageType, true);
+    if (pageType === PageType.VTO && config.targets) {
+      const list = document.getElementById('vto-targets-list');
+      config.targets.forEach(target => {
+        list.appendChild(createVtoTargetEntry(target));
+      });
+
+      if (config.isRunning) {
+        updateStatus(pageType, true, config.targets.length);
+      }
+    } else {
+      if (config.date) {
+        document.getElementById(`${pageType}-date`).value = config.date;
+      }
+      if (config.time) {
+        document.getElementById(`${pageType}-time`).value = config.time;
+      }
+      if (config.isRunning) {
+        updateStatus(pageType, true, 1);
+      }
     }
   }
 }
@@ -101,16 +207,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSavedState(pageType);
   }
 
+  // Add default VTO target if none exist
+  if (pageType === PageType.VTO) {
+    const list = document.getElementById('vto-targets-list');
+    if (list.children.length === 0) {
+      list.appendChild(createVtoTargetEntry());
+    }
+  }
+
+  // Event listeners
+  document.getElementById('vto-add-target').addEventListener('click', () => {
+    document.getElementById('vto-targets-list').appendChild(createVtoTargetEntry());
+  });
+
   document.getElementById('vto-start').addEventListener('click', () => startAutomation(PageType.VTO));
   document.getElementById('vto-stop').addEventListener('click', () => stopAutomation(PageType.VTO));
   document.getElementById('vet-start').addEventListener('click', () => startAutomation(PageType.VET));
   document.getElementById('vet-stop').addEventListener('click', () => stopAutomation(PageType.VET));
-
-  // VTO date group toggle functionality
-  document.querySelectorAll('.vto-date-header').forEach(header => {
-    header.addEventListener('click', () => {
-      const isExpanded = header.dataset.expanded === 'true';
-      header.dataset.expanded = isExpanded ? 'false' : 'true';
-    });
-  });
 });
