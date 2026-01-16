@@ -105,4 +105,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('vto-stop').addEventListener('click', () => stopAutomation(PageType.VTO));
   document.getElementById('vet-start').addEventListener('click', () => startAutomation(PageType.VET));
   document.getElementById('vet-stop').addEventListener('click', () => stopAutomation(PageType.VET));
+
+  // VTO date group toggle functionality
+  document.querySelectorAll('.vto-date-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const isExpanded = header.dataset.expanded === 'true';
+      header.dataset.expanded = isExpanded ? 'false' : 'true';
+    });
+  });
 });

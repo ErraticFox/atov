@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A-to-Z Auto</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="container">
     <h1>A-to-Z Auto</h1>
@@ -15,20 +17,81 @@
     </div>
 
     <div id="vto-section" class="page-section hidden">
-      <h2>VTO - Voluntary Time Off</h2>
-      <div class="form-group">
-        <label for="vto-date">Date(s)</label>
-        <input type="date" id="vto-date" multiple>
+      <div class="vto-header">
+        <h2>Voluntary Time Off (VTO)</h2>
+        <p class="vto-subtitle">Accepting Voluntary Time Off (VTO) is optional. If VTO is accepted the selected hours
+          will be removed from your schedule.</p>
       </div>
-      <div class="form-group">
-        <label for="vto-time">Time</label>
-        <input type="time" id="vto-time">
+
+      <div class="vto-slots-container">
+        <!-- Example date group - will be dynamically populated -->
+        <div class="vto-date-group">
+          <div class="vto-date-header" data-expanded="true">
+            <span class="vto-date-text">Fri, Jan 16</span>
+            <span class="vto-chevron">▲</span>
+          </div>
+          <div class="vto-date-slots">
+            <div class="vto-slot-card">
+              <div class="vto-time-row">
+                <span class="vto-time-range">1:20am - 11:50am</span>
+                <span class="vto-duration">(<span class="dur-hours">10</span>hrs <span
+                    class="dur-mins">30</span>mins)</span>
+              </div>
+              <div class="vto-sort-label">SORT_1</div>
+              <div class="vto-status-indicator">
+                <span class="vto-filled-icon">⊘</span>
+                <span class="vto-filled-text">VTO Filled</span>
+              </div>
+            </div>
+
+            <div class="vto-slot-card">
+              <div class="vto-time-row">
+                <span class="vto-time-range">1:20am - 4:00am</span>
+                <span class="vto-duration">(<span class="dur-hours">2</span>hrs <span
+                    class="dur-mins">40</span>mins)</span>
+              </div>
+              <div class="vto-sort-label">SORT_1</div>
+              <div class="vto-status-indicator">
+                <span class="vto-filled-icon">⊘</span>
+                <span class="vto-filled-text">VTO Filled</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="vto-date-group">
+          <div class="vto-date-header" data-expanded="true">
+            <span class="vto-date-text">Thu, Jan 22</span>
+            <span class="vto-chevron">▲</span>
+          </div>
+          <div class="vto-date-slots">
+            <div class="vto-slot-card vto-slot-available">
+              <div class="vto-time-row">
+                <span class="vto-time-range">1:20am - 9:10am</span>
+                <span class="vto-duration">(<span class="dur-hours">7</span>hrs <span
+                    class="dur-mins">50</span>mins)</span>
+              </div>
+              <div class="vto-sort-label">READY</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="controls">
-        <button id="vto-start" class="btn btn-start">Start</button>
-        <button id="vto-stop" class="btn btn-stop" disabled>Stop</button>
+
+      <div class="vto-controls-section">
+        <div class="form-group">
+          <label for="vto-date">Target Date</label>
+          <input type="date" id="vto-date">
+        </div>
+        <div class="form-group">
+          <label for="vto-time">Target Time</label>
+          <input type="time" id="vto-time">
+        </div>
+        <div class="controls">
+          <button id="vto-start" class="btn btn-start">Start</button>
+          <button id="vto-stop" class="btn btn-stop" disabled>Stop</button>
+        </div>
+        <div id="vto-status" class="status"></div>
       </div>
-      <div id="vto-status" class="status"></div>
     </div>
 
     <div id="vet-section" class="page-section hidden">
@@ -51,4 +114,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>

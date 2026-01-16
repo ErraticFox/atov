@@ -130,3 +130,125 @@ h2 {
   color: #545b64;
   padding: 20px 0;
 }
+
+/* VTO Section Styles */
+.vto-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #232f3e;
+  margin-bottom: 4px;
+}
+
+.vto-subtitle {
+  font-size: 11px;
+  color: #687078;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.vto-slots-container {
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.vto-date-group {
+  margin-bottom: 8px;
+}
+
+.vto-date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vto-date-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #232f3e;
+}
+
+.vto-chevron {
+  font-size: 10px;
+  color: #545b64;
+  transition: transform 0.2s;
+}
+
+.vto-date-header[data-expanded="false"] .vto-chevron {
+  transform: rotate(180deg);
+}
+
+.vto-date-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vto-date-header[data-expanded="false"] + .vto-date-slots {
+  display: none;
+}
+
+.vto-slot-card {
+  background: #e8eaed;
+  border-radius: 4px;
+  padding: 10px 12px;
+  border-left: 3px solid #545b64;
+}
+
+.vto-slot-available {
+  border-left-color: #1d8102;
+}
+
+.vto-time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.vto-time-range {
+  font-size: 13px;
+  font-weight: 600;
+  color: #232f3e;
+}
+
+.vto-duration {
+  font-size: 12px;
+  color: #545b64;
+}
+
+.dur-hours {
+  color: #0073bb;
+}
+
+.dur-mins {
+  color: #d13212;
+}
+
+.vto-sort-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #545b64;
+  margin-bottom: 4px;
+}
+
+.vto-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #687078;
+}
+
+.vto-filled-icon {
+  font-size: 12px;
+}
+
+.vto-controls-section {
+  border-top: 1px solid #d5d9d9;
+  padding-top: 12px;
+  margin-top: 8px;
+}
