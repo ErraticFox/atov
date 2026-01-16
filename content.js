@@ -48,14 +48,95 @@ function matchesTimeRange(slotTimeRange, targetStart, targetEnd) {
 }
 
 /**
+ * Parse 12h time string (e.g., "1:20am") to minutes since midnight
+ */
+function parse12HourToMinutes(time12) {
+  const match = time12.toLowerCase().match(/(\d+):(\d+)(am|pm)/);
+  if (!match) return null;
+
+  let hours = parseInt(match[1], 10);
+  const mins = parseInt(match[2], 10);
+  const period = match[3];
+
+  if (period === 'pm' && hours !== 12) hours += 12;
+  if (period === 'am' && hours === 12) hours = 0;
+
+  return hours * 60 + mins;
+}
+
+/**
+ * Parse 24h time string (e.g., "01:20") to minutes since midnight
+ */
+function parse24HourToMinutes(time24) {
+  if (!time24) return null;
+  const [hours, mins] = time24.split(':').map(Number);
+  return hours * 60 + mins;
+}
+
+/**
+ * Extract start and end times from slot time range (e.g., "1:20am - 1:50am")
+ */
+function parseSlotTimeRange(slotTimeRange) {
+  const match = slotTimeRange.toLowerCase().match(/(\d+:\d+(?:am|pm))\s*-\s*(\d+:\d+(?:am|pm))/);
+  if (!match) return null;
+  return {
+    start: parse12HourToMinutes(match[1]),
+    end: parse12HourToMinutes(match[2])
+  };
+}
+
+/**
+ * Check if a VTO slot is within the user's shift time and meets min duration
+ */
+function isWithinShiftAndMinDuration(slotTimeRange, shiftTime, minDurationHours) {
+  if (!slotTimeRange || !shiftTime?.start || !shiftTime?.end) return false;
+
+  const slot = parseSlotTimeRange(slotTimeRange);
+  if (!slot) return false;
+
+  const shiftStart = parse24HourToMinutes(shiftTime.start);
+  const shiftEnd = parse24HourToMinutes(shiftTime.end);
+
+  if (shiftStart === null || shiftEnd === null) return false;
+
+  // Check if slot is within shift time
+  // Handle overnight shifts (shift end < shift start)
+  let isWithinShift;
+  if (shiftEnd > shiftStart) {
+    // Normal shift (e.g., 9am - 5pm)
+    isWithinShift = slot.start >= shiftStart && slot.end <= shiftEnd;
+  } else {
+    // Overnight shift (e.g., 10pm - 6am)
+    isWithinShift = (slot.start >= shiftStart || slot.start < shiftEnd) &&
+      (slot.end <= shiftEnd || slot.end > shiftStart);
+  }
+
+  if (!isWithinShift) return false;
+
+  // Check minimum duration
+  let durationMins = slot.end - slot.start;
+  if (durationMins < 0) durationMins += 24 * 60; // Handle overnight VTO
+
+  const minDurationMins = minDurationHours * 60;
+  return durationMins >= minDurationMins;
+}
+
+/**
  * Find a VTO slot that matches any of the user's targets
  * @returns {Element|null} The accept button element if found
  */
-function findMatchingVtoSlot() {
-  if (!config || !config.targets || config.targets.length === 0) return null;
+let currentTargetIndex = -1;
 
+/**
+ * Find a VTO slot that matches any of the user's targets
+ * @returns {Object|null} Object containing { element, targetIndex } if found, else null
+ */
+function findMatchingVtoSlot() {
   const pageType = getPageType();
   if (pageType !== 'vto') return null;
+
+  const hasTargets = config?.targets && config.targets.length > 0;
+  if (!hasTargets) return null;
 
   // Find all date groups (expanders)
   const expanders = document.querySelectorAll('[data-test-component="StencilExpander"]');
@@ -82,7 +163,8 @@ function findMatchingVtoSlot() {
       }
 
       // Check against each target
-      for (const target of config.targets) {
+      for (let i = 0; i < config.targets.length; i++) {
+        const target = config.targets[i];
         // Check date match (if date is specified)
         if (target.date) {
           const targetDateStr = formatDateForMatch(target.date);
@@ -91,16 +173,26 @@ function findMatchingVtoSlot() {
           }
         }
 
-        // Check time match
-        if (matchesTimeRange(timeRange, target.startTime, target.endTime)) {
-          // Find the Accept button using aria-label
-          const acceptButton = card.querySelector('button[aria-label^="Accept"]');
-
-          if (acceptButton) {
-            console.log('[A-to-Z Auto] Found matching VTO:', dateText, timeRange);
-            return acceptButton;
-          } else {
-            console.log('[A-to-Z Auto] Found matching slot but no accept button:', dateText, timeRange);
+        // Check if this target is "Accept Any" mode
+        if (target.acceptAny) {
+          // Accept Any: check if within shift time and meets min duration
+          if (isWithinShiftAndMinDuration(timeRange, config.shiftTime, target.minDuration || 0)) {
+            const acceptButton = card.querySelector('button[aria-label^="Accept"]');
+            if (acceptButton) {
+              console.log('[A-to-Z Auto] Accept Any - Found VTO:', dateText, timeRange);
+              return { element: acceptButton, targetIndex: i };
+            }
+          }
+        } else {
+          // Specific time match
+          if (matchesTimeRange(timeRange, target.startTime, target.endTime)) {
+            const acceptButton = card.querySelector('button[aria-label^="Accept"]');
+            if (acceptButton) {
+              console.log('[A-to-Z Auto] Found matching VTO:', dateText, timeRange);
+              return { element: acceptButton, targetIndex: i };
+            } else {
+              console.log('[A-to-Z Auto] Found matching slot but no accept button:', dateText, timeRange);
+            }
           }
         }
       }
@@ -124,22 +216,59 @@ function handleConfirmationDialog() {
   return false;
 }
 
+async function removeAcceptedTarget() {
+  if (currentTargetIndex === -1) return;
+
+  try {
+    const result = await chrome.storage.local.get('vto');
+    const vtoData = result.vto || {};
+
+    // We double check if we can remove
+    // Note: vtoData.targets is the source of truth for the popup list.
+    // config.targets was a snapshot or mapped version.
+    // We assume index alignment.
+    if (vtoData.targets && vtoData.targets.length > currentTargetIndex) {
+      console.log(`[A-to-Z Auto] Removing accepted target at index ${currentTargetIndex}`);
+      vtoData.targets.splice(currentTargetIndex, 1);
+
+      // Update config to match (and stop it)
+      const newConfig = {
+        ...config,
+        targets: vtoData.targets,
+        isRunning: false
+      };
+
+      // Save everything back to 'vto' key
+      await chrome.storage.local.set({
+        vto: { ...vtoData, targets: vtoData.targets, isRunning: false }
+      });
+
+      console.log('[A-to-Z Auto] Target removed and storage updated.');
+    }
+  } catch (err) {
+    console.error('[A-to-Z Auto] Error removing accepted target:', err);
+  }
+}
+
 function checkAndClick() {
   if (!isRunning) return;
 
   // First check if confirmation dialog is open
   if (handleConfirmationDialog()) {
-    console.log('[A-to-Z Auto] VTO accepted! Stopping automation...');
-    stopAutomation();
+    console.log('[A-to-Z Auto] VTO accepted! Stopping automation and cleaning up...');
+    removeAcceptedTarget().then(() => {
+      stopAutomation();
+    });
     return;
   }
 
   // Otherwise look for a matching VTO slot
-  const acceptButton = findMatchingVtoSlot();
+  const match = findMatchingVtoSlot();
 
-  if (acceptButton) {
+  if (match) {
     console.log('[A-to-Z Auto] Clicking Accept on matching VTO slot...');
-    acceptButton.click();
+    currentTargetIndex = match.targetIndex;
+    match.element.click();
     // Wait for dialog to appear, then check again
     setTimeout(() => checkAndClick(), 500);
   } else {
@@ -152,11 +281,12 @@ function checkAndClick() {
 function startAutomation(newConfig) {
   config = newConfig;
   isRunning = true;
+  currentTargetIndex = -1;
 
   // Check immediately
   checkAndClick();
 
-  const targetCount = config.targets?.length || 1;
+  const targetCount = config.targets?.length || 0;
   console.log(`[A-to-Z Auto] Started - watching ${targetCount} VTO target(s)`);
 }
 
@@ -164,6 +294,15 @@ function stopAutomation() {
   isRunning = false;
   config = null;
   console.log('[A-to-Z Auto] Stopped');
+
+  // Ensure we mark as stopped in storage so popup reflects it immediately if verified
+  chrome.storage.local.get(['vto', 'vet'], (result) => {
+    const pageType = getPageType();
+    if (pageType && result[pageType]) {
+      const updated = { ...result[pageType], isRunning: false };
+      chrome.storage.local.set({ [pageType]: updated });
+    }
+  });
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

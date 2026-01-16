@@ -19,7 +19,8 @@
     <div id="vto-section" class="page-section hidden">
       <div class="vto-header">
         <h2>Voluntary Time Off (VTO)</h2>
-        <p class="vto-subtitle">Add VTO slots you're looking for. The extension will auto-refresh and accept when found.</p>
+        <p class="vto-subtitle">Add VTO slots you're looking for. The extension will auto-refresh and accept when found.
+        </p>
       </div>
 
       <div class="shift-settings">
@@ -38,11 +39,57 @@
         </div>
       </div>
 
-      <div id="vto-targets-list">
-        <!-- VTO target entries will be added here -->
+      <div class="vto-add-section">
+        <div class="vto-form-card">
+          <div class="form-group">
+            <label>Date (optional)</label>
+            <input type="date" id="new-vto-date">
+          </div>
+
+          <div class="vto-checkbox-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="new-vto-accept-any">
+              <span>Accept Any</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="new-vto-fullshift">
+              <span>Full Shift</span>
+            </label>
+          </div>
+
+          <div id="new-vto-min-duration-row" class="vto-min-duration-row hidden">
+            <div class="form-group">
+              <label>Min Duration</label>
+              <select id="new-vto-min-duration">
+                <option value="0">Any</option>
+                <option value="1">1+ hr</option>
+                <option value="2">2+ hr</option>
+                <option value="3">3+ hr</option>
+                <option value="4">4+ hr</option>
+                <option value="5">5+ hr</option>
+                <option value="6">6+ hr</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="new-vto-time-row" class="vto-time-row">
+            <div class="form-group">
+              <label>Start Time</label>
+              <input type="time" id="new-vto-start">
+            </div>
+            <div class="form-group">
+              <label>End Time</label>
+              <input type="time" id="new-vto-end">
+            </div>
+          </div>
+
+          <button id="vto-add-btn" class="btn btn-add">Add to List</button>
+        </div>
       </div>
 
-      <button id="vto-add-target" class="btn btn-add">+ Add VTO Target</button>
+      <div id="vto-targets-list" class="vto-list-container">
+        <!-- VTO target cards will be added here -->
+      </div>
 
       <div class="controls">
         <button id="vto-start" class="btn btn-start">Start</button>

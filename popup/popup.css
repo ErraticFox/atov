@@ -39,7 +39,7 @@ h2 {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .form-group {
@@ -148,7 +148,122 @@ h2 {
   padding: 20px 0;
 }
 
-/* VTO Section Styles */
+/* VTO Form Card (New Static Input) */
+.vto-form-card {
+  background: #1a1a1a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #303030;
+}
+
+.vto-add-section {
+  margin-bottom: 20px;
+}
+
+/* VTO List Styling */
+.vto-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  /* Space for scrollbar */
+}
+
+.vto-date-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: #70b070;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  padding-left: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #303030;
+  padding-bottom: 4px;
+}
+
+.vto-date-header:first-child {
+  margin-top: 0;
+}
+
+.vto-item-card {
+  background: #252525;
+  border-radius: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid #70b070;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.vto-item-card:hover {
+  background: #2a2a2a;
+}
+
+.vto-item-info {
+  flex: 1;
+}
+
+.vto-item-main {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+  margin-bottom: 2px;
+}
+
+.vto-item-sub {
+  font-size: 11px;
+  color: #909090;
+}
+
+.vto-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: #606060;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background: #353535;
+  color: #e0e0e0;
+}
+
+.icon-btn.delete:hover {
+  background: #3a2a2a;
+  color: #e06060;
+}
+
+/* Scrollbar styling for list */
+.vto-list-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vto-list-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vto-list-container::-webkit-scrollbar-thumb {
+  background-color: #404040;
+  border-radius: 3px;
+}
+
 .vto-header h2 {
   font-size: 16px;
   font-weight: 600;
@@ -272,4 +387,30 @@ h2 {
   height: 14px;
   accent-color: #606060;
   cursor: pointer;
+}
+
+/* Checkbox row styling */
+.vto-checkbox-row {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+/* Min duration row */
+.vto-min-duration-row {
+  margin: 4px 0;
+}
+
+.vto-min-duration-row .form-group {
+  margin-bottom: 0;
+}
+
+.vto-min-duration-row select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #252525;
+  color: #e0e0e0;
 }

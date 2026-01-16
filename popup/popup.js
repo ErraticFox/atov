@@ -6,7 +6,7 @@ const PageType = {
   UNKNOWN: 'unknown'
 };
 
-let vtoTargetCount = 0;
+let vtoTargets = [];
 
 function detectPageType(url) {
   if (!url) return PageType.UNKNOWN;
@@ -29,13 +29,13 @@ function showSection(pageType) {
   }
 }
 
-function updateStatus(pageType, isRunning, targetCount = 0) {
+function updateStatus(pageType, isRunning, statusInfo = '') {
   const statusEl = document.getElementById(`${pageType}-status`);
   const startBtn = document.getElementById(`${pageType}-start`);
   const stopBtn = document.getElementById(`${pageType}-stop`);
 
   if (isRunning) {
-    statusEl.textContent = `Running... Watching ${targetCount} target(s)`;
+    statusEl.textContent = `Running... Watching ${statusInfo}`;
     statusEl.className = 'status running';
     startBtn.disabled = true;
     stopBtn.disabled = false;
@@ -48,82 +48,180 @@ function updateStatus(pageType, isRunning, targetCount = 0) {
 }
 
 /**
- * Create a new VTO target entry element
+ * Handle static form logic (checkbox toggles)
  */
-function createVtoTargetEntry(data = {}) {
-  vtoTargetCount++;
-  const entry = document.createElement('div');
-  entry.className = 'vto-target-entry';
-  entry.dataset.id = vtoTargetCount;
+function initFormListeners() {
+  const acceptAnyCheckbox = document.getElementById('new-vto-accept-any');
+  const fullShiftCheckbox = document.getElementById('new-vto-fullshift');
+  const fullShiftLabel = fullShiftCheckbox.closest('.checkbox-label');
+  const minDurationRow = document.getElementById('new-vto-min-duration-row');
+  const timeRow = document.getElementById('new-vto-time-row');
 
-  const isFullShift = data.fullShift || false;
-
-  entry.innerHTML = `
-    <div class="vto-target-header">
-      <span class="vto-target-num">Target #${vtoTargetCount}</span>
-      <button class="vto-target-remove" title="Remove">×</button>
-    </div>
-    <div class="vto-target-fields">
-      <div class="form-group">
-        <label>Date (optional)</label>
-        <input type="date" class="vto-date" value="${data.date || ''}">
-      </div>
-      <div class="vto-fullshift-row">
-        <label class="checkbox-label">
-          <input type="checkbox" class="vto-fullshift" ${isFullShift ? 'checked' : ''}>
-          <span>Full Shift</span>
-        </label>
-      </div>
-      <div class="vto-time-row ${isFullShift ? 'hidden' : ''}">
-        <div class="form-group">
-          <label>Start Time</label>
-          <input type="time" class="vto-start" value="${data.startTime || ''}">
-        </div>
-        <div class="form-group">
-          <label>End Time</label>
-          <input type="time" class="vto-end" value="${data.endTime || ''}">
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Add remove handler
-  entry.querySelector('.vto-target-remove').addEventListener('click', () => {
-    entry.remove();
-    renumberVtoTargets();
-    saveVtoTargets();
+  acceptAnyCheckbox.addEventListener('change', () => {
+    if (acceptAnyCheckbox.checked) {
+      fullShiftLabel.classList.add('hidden');
+      minDurationRow.classList.remove('hidden');
+      timeRow.classList.add('hidden');
+    } else {
+      fullShiftLabel.classList.remove('hidden');
+      minDurationRow.classList.add('hidden');
+      if (!fullShiftCheckbox.checked) {
+        timeRow.classList.remove('hidden');
+      }
+    }
   });
 
-  // Full shift checkbox toggle
-  const fullShiftCheckbox = entry.querySelector('.vto-fullshift');
-  const timeRow = entry.querySelector('.vto-time-row');
   fullShiftCheckbox.addEventListener('change', () => {
     if (fullShiftCheckbox.checked) {
       timeRow.classList.add('hidden');
-    } else {
+    } else if (!acceptAnyCheckbox.checked) {
       timeRow.classList.remove('hidden');
     }
-    saveVtoTargets();
   });
-
-  // Auto-save on input change
-  entry.querySelectorAll('input').forEach(input => {
-    if (!input.classList.contains('vto-fullshift')) {
-      input.addEventListener('change', () => saveVtoTargets());
-    }
-  });
-
-  return entry;
 }
 
 /**
- * Renumber VTO targets after removal
+ * Render the list of targets with headers and controls
  */
-function renumberVtoTargets() {
-  const entries = document.querySelectorAll('.vto-target-entry');
-  entries.forEach((entry, index) => {
-    entry.querySelector('.vto-target-num').textContent = `Target #${index + 1}`;
+function renderVtoTargets() {
+  const list = document.getElementById('vto-targets-list');
+  list.innerHTML = '';
+
+  let lastDate = null;
+
+  vtoTargets.forEach((target, index) => {
+    // Determine display date
+    const displayDate = target.date ? target.date : 'Any Date';
+
+    // Render Header if date changes
+    if (displayDate !== lastDate) {
+      const header = document.createElement('div');
+      header.className = 'vto-date-header';
+      header.textContent = displayDate;
+      list.appendChild(header);
+      lastDate = displayDate;
+    }
+
+    // Create Item Card
+    const card = document.createElement('div');
+    card.className = 'vto-item-card';
+
+    // Description logic
+    let mainText = '';
+    let subText = '';
+
+    if (target.acceptAny) {
+      mainText = 'Accept Any';
+      if (target.minDuration > 0) {
+        subText = `Min Duration: ${target.minDuration}hr+`;
+      }
+    } else if (target.fullShift) {
+      mainText = 'Full Shift';
+    } else {
+      // time range
+      const formatTime = (t) => {
+        if (!t) return '??:??';
+        return t;
+      };
+      mainText = `${formatTime(target.startTime)} - ${formatTime(target.endTime)}`;
+    }
+
+    // Min duration label for non-accept-any if we want to show it? 
+    // The current logic only had min duration for accept any.
+    // Wait, the previous logic stored minDuration for everyone but only showed input for AcceptAny?
+    // Let's stick to the previous visibility logic: Only relevant for AcceptAny?
+    // Actually, looking at the code: "vto-min-duration-row ${isAcceptAny ? '' : 'hidden'}"
+    // So yes, it was only for Accept Any.
+
+    card.innerHTML = `
+      <div class="vto-item-info">
+        <div class="vto-item-main">${mainText}</div>
+        <div class="vto-item-sub">${subText}</div>
+      </div>
+      <div class="vto-item-actions">
+        <button class="icon-btn move-up" title="Move Up" ${index === 0 ? 'disabled' : ''}>▲</button>
+        <button class="icon-btn move-down" title="Move Down" ${index === vtoTargets.length - 1 ? 'disabled' : ''}>▼</button>
+        <button class="icon-btn delete" title="Delete">×</button>
+      </div>
+    `;
+
+    // Bind Actions
+    card.querySelector('.move-up').addEventListener('click', () => moveTarget(index, -1));
+    card.querySelector('.move-down').addEventListener('click', () => moveTarget(index, 1));
+    card.querySelector('.delete').addEventListener('click', () => deleteTarget(index));
+
+    list.appendChild(card);
   });
+}
+
+function moveTarget(index, direction) {
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= vtoTargets.length) return;
+
+  // Swap
+  const temp = vtoTargets[index];
+  vtoTargets[index] = vtoTargets[newIndex];
+  vtoTargets[newIndex] = temp;
+
+  saveVtoTargets();
+  renderVtoTargets();
+}
+
+function deleteTarget(index) {
+  vtoTargets.splice(index, 1);
+  saveVtoTargets();
+  renderVtoTargets();
+}
+
+function addTargetFromForm() {
+  const dateInput = document.getElementById('new-vto-date');
+  const acceptAnyInput = document.getElementById('new-vto-accept-any');
+  const fullShiftInput = document.getElementById('new-vto-fullshift');
+  const minDurationInput = document.getElementById('new-vto-min-duration');
+  const startInput = document.getElementById('new-vto-start');
+  const endInput = document.getElementById('new-vto-end');
+
+  const newTarget = {
+    date: dateInput.value,
+    acceptAny: acceptAnyInput.checked,
+    fullShift: fullShiftInput.checked,
+    minDuration: parseInt(minDurationInput.value, 10),
+    startTime: startInput.value,
+    endTime: endInput.value
+  };
+
+  // Basic validation?
+  // If not Accept Any and not Full Shift, must have times
+  if (!newTarget.acceptAny && !newTarget.fullShift && (!newTarget.startTime || !newTarget.endTime)) {
+    // We could warn, but maybe user wants to partially fill? 
+    // The previous logic allowed saving anything but warned on Start.
+    // Let's enforce it for the list to be clean.
+    alert('Please specify Start and End times, or select Full Shift / Accept Any.');
+    return;
+  }
+
+  // Add to list
+  // Logic: "grouped by date". 
+  // If we want to enforce grouping, we should find the index of the last item with this date and insert after it.
+  // OR just push to end and let user reorder.
+  // User asked: "add to the list (grouped by date) which then can be reorganized by prioirty"
+  // I will check if there are existing items with this date. If so, append after the last one of that date.
+  // Else append to end.
+
+  let insertIndex = vtoTargets.length;
+  if (newTarget.date) {
+    // Find last index of this date
+    for (let i = vtoTargets.length - 1; i >= 0; i--) {
+      if (vtoTargets[i].date === newTarget.date) {
+        insertIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  vtoTargets.splice(insertIndex, 0, newTarget);
+  saveVtoTargets();
+  renderVtoTargets();
 }
 
 /**
@@ -137,47 +235,14 @@ function getShiftTime() {
 }
 
 /**
- * Get all VTO targets from the form (includes partial entries for saving)
- */
-function getVtoTargets(includePartial = false, resolveFullShift = false) {
-  const entries = document.querySelectorAll('.vto-target-entry');
-  const targets = [];
-  const shiftTime = getShiftTime();
-
-  entries.forEach(entry => {
-    const date = entry.querySelector('.vto-date').value;
-    const fullShift = entry.querySelector('.vto-fullshift').checked;
-    let startTime = entry.querySelector('.vto-start').value;
-    let endTime = entry.querySelector('.vto-end').value;
-
-    // If full shift is checked and we're resolving, use shift times
-    if (fullShift && resolveFullShift) {
-      startTime = shiftTime.start;
-      endTime = shiftTime.end;
-    }
-
-    if (includePartial) {
-      targets.push({ date, startTime, endTime, fullShift });
-    } else if (fullShift && shiftTime.start && shiftTime.end) {
-      targets.push({ date, startTime, endTime, fullShift });
-    } else if (!fullShift && startTime && endTime) {
-      targets.push({ date, startTime, endTime, fullShift });
-    }
-  });
-
-  return targets;
-}
-
-/**
  * Save VTO targets and shift time to local storage
  */
 async function saveVtoTargets() {
-  const targets = getVtoTargets(true);
   const shiftTime = getShiftTime();
   const result = await chrome.storage.local.get('vto');
   const existing = result.vto || {};
   await chrome.storage.local.set({
-    vto: { ...existing, targets, shiftTime }
+    vto: { ...existing, targets: vtoTargets, shiftTime }
   });
 }
 
@@ -195,24 +260,34 @@ async function saveShiftTime() {
 
 async function startAutomation(pageType) {
   if (pageType === PageType.VTO) {
-    const targets = getVtoTargets(false, true); // resolve full shift times
     const shiftTime = getShiftTime();
 
-    if (targets.length === 0) {
-      alert('Please add at least one VTO target with start and end times');
+    if (vtoTargets.length === 0) {
+      alert('Please add at least one VTO target');
       return;
     }
 
-    // Check if any full shift target but no shift time set
-    const hasFullShift = targets.some(t => t.fullShift);
-    if (hasFullShift && (!shiftTime.start || !shiftTime.end)) {
-      alert('Please set your shift time to use Full Shift targets');
+    // Check if any Accept Any or Full Shift target but no shift time set
+    const needsShiftTime = vtoTargets.some(t => t.acceptAny || t.fullShift);
+    if (needsShiftTime && (!shiftTime.start || !shiftTime.end)) {
+      alert('Please set your shift time to use Accept Any or Full Shift');
       return;
     }
+
+    // Resolve targets for the content script
+    // We create a copy where we fill in the full shift times
+    const resolvedTargets = vtoTargets.map(t => {
+      const copy = { ...t };
+      if (copy.fullShift) {
+        copy.startTime = shiftTime.start;
+        copy.endTime = shiftTime.end;
+      }
+      return copy;
+    });
 
     const config = {
       pageType: pageType,
-      targets: targets,
+      targets: resolvedTargets,
       shiftTime: shiftTime,
       isRunning: true
     };
@@ -222,7 +297,7 @@ async function startAutomation(pageType) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
 
-    updateStatus(pageType, true, targets.length);
+    updateStatus(pageType, true, `${resolvedTargets.length} target(s)`);
   } else {
     const dateInput = document.getElementById(`${pageType}-date`);
     const timeInput = document.getElementById(`${pageType}-time`);
@@ -270,14 +345,12 @@ async function loadSavedState(pageType) {
 
       // Load targets
       if (config.targets) {
-        const list = document.getElementById('vto-targets-list');
-        config.targets.forEach(target => {
-          list.appendChild(createVtoTargetEntry(target));
-        });
+        vtoTargets = config.targets;
+        renderVtoTargets();
+      }
 
-        if (config.isRunning) {
-          updateStatus(pageType, true, config.targets.length);
-        }
+      if (config.isRunning) {
+        updateStatus(pageType, true, `${config.targets?.length || 0} target(s)`);
       }
     } else {
       if (config.date) {
@@ -301,24 +374,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (pageType !== PageType.UNKNOWN) {
     await loadSavedState(pageType);
+  } else {
+    // TEMPORARY: For development testing of the popup logic without being on the Amazon page
+    // Uncomment this block to test UI in a normal tab if needed, but for extension logic we usually need the context.
+    // However, to show the UI even if unknown:
+    // showSection(PageType.VTO);
+    // initFormListeners();
   }
 
-  // Add default VTO target if none exist
+  // Always init form listeners for VTO (so they work if the section is shown)
   if (pageType === PageType.VTO) {
-    const list = document.getElementById('vto-targets-list');
-    if (list.children.length === 0) {
-      list.appendChild(createVtoTargetEntry());
-    }
+    initFormListeners();
   }
 
   // Event listeners
   document.getElementById('shift-start').addEventListener('change', () => saveShiftTime());
   document.getElementById('shift-end').addEventListener('change', () => saveShiftTime());
 
-  document.getElementById('vto-add-target').addEventListener('click', () => {
-    document.getElementById('vto-targets-list').appendChild(createVtoTargetEntry());
-    saveVtoTargets();
-  });
+  // Changed from previous "add blank" to "add from form"
+  const addBtn = document.getElementById('vto-add-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => addTargetFromForm());
+  }
 
   document.getElementById('vto-start').addEventListener('click', () => startAutomation(PageType.VTO));
   document.getElementById('vto-stop').addEventListener('click', () => stopAutomation(PageType.VTO));
