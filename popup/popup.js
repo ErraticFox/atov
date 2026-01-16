@@ -35,7 +35,7 @@ function updateStatus(pageType, isRunning, targetCount = 0) {
   const stopBtn = document.getElementById(`${pageType}-stop`);
 
   if (isRunning) {
-    statusEl.textContent = `Running... Checking ${targetCount} target(s) every 2 sec`;
+    statusEl.textContent = `Running... Watching ${targetCount} target(s)`;
     statusEl.className = 'status running';
     startBtn.disabled = true;
     stopBtn.disabled = false;
@@ -83,6 +83,12 @@ function createVtoTargetEntry(data = {}) {
   entry.querySelector('.vto-target-remove').addEventListener('click', () => {
     entry.remove();
     renumberVtoTargets();
+    saveVtoTargets();
+  });
+
+  // Auto-save on input change
+  entry.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => saveVtoTargets());
   });
 
   return entry;
@@ -99,9 +105,9 @@ function renumberVtoTargets() {
 }
 
 /**
- * Get all VTO targets from the form
+ * Get all VTO targets from the form (includes partial entries for saving)
  */
-function getVtoTargets() {
+function getVtoTargets(includePartial = false) {
   const entries = document.querySelectorAll('.vto-target-entry');
   const targets = [];
 
@@ -110,12 +116,24 @@ function getVtoTargets() {
     const startTime = entry.querySelector('.vto-start').value;
     const endTime = entry.querySelector('.vto-end').value;
 
-    if (startTime && endTime) {
+    if (includePartial || (startTime && endTime)) {
       targets.push({ date, startTime, endTime });
     }
   });
 
   return targets;
+}
+
+/**
+ * Save VTO targets to local storage
+ */
+async function saveVtoTargets() {
+  const targets = getVtoTargets(true);
+  const result = await chrome.storage.local.get('vto');
+  const existing = result.vto || {};
+  await chrome.storage.local.set({
+    vto: { ...existing, targets }
+  });
 }
 
 async function startAutomation(pageType) {
@@ -160,8 +178,11 @@ async function startAutomation(pageType) {
 }
 
 async function stopAutomation(pageType) {
-  const config = { isRunning: false };
-  await chrome.storage.local.set({ [pageType]: config });
+  const result = await chrome.storage.local.get(pageType);
+  const existing = result[pageType] || {};
+  await chrome.storage.local.set({
+    [pageType]: { ...existing, isRunning: false }
+  });
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   chrome.tabs.sendMessage(tab.id, { action: 'stop' });
@@ -218,6 +239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event listeners
   document.getElementById('vto-add-target').addEventListener('click', () => {
     document.getElementById('vto-targets-list').appendChild(createVtoTargetEntry());
+    saveVtoTargets();
   });
 
   document.getElementById('vto-start').addEventListener('click', () => startAutomation(PageType.VTO));
