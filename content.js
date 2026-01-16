@@ -2,7 +2,6 @@
 
 let isRunning = false;
 let config = null;
-let refreshInterval = null;
 
 function getPageType() {
   const url = window.location.href;
@@ -144,7 +143,9 @@ function checkAndClick() {
     // Wait for dialog to appear, then check again
     setTimeout(() => checkAndClick(), 500);
   } else {
-    console.log('[A-to-Z Auto] No matching VTO found, will refresh...');
+    // No match found, refresh immediately
+    console.log('[A-to-Z Auto] No matching VTO found, refreshing...');
+    window.location.reload();
   }
 }
 
@@ -155,16 +156,6 @@ function startAutomation(newConfig) {
   // Check immediately
   checkAndClick();
 
-  // Set up 2-second refresh interval
-  if (!refreshInterval) {
-    refreshInterval = setInterval(() => {
-      if (isRunning) {
-        console.log('[A-to-Z Auto] Refreshing page...');
-        window.location.reload();
-      }
-    }, 2000);
-  }
-
   const targetCount = config.targets?.length || 1;
   console.log(`[A-to-Z Auto] Started - watching ${targetCount} VTO target(s)`);
 }
@@ -172,12 +163,6 @@ function startAutomation(newConfig) {
 function stopAutomation() {
   isRunning = false;
   config = null;
-
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-    refreshInterval = null;
-  }
-
   console.log('[A-to-Z Auto] Stopped');
 }
 
