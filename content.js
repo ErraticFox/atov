@@ -2,6 +2,104 @@
 
 let isRunning = false;
 let config = null;
+let sessionKeepAliveObserver = null;
+
+/**
+ * Handle the "Are you still there?" session timeout dialog
+ * Clicks "Stay logged in" to prevent automatic logout
+ * @returns {Promise<boolean>} True if dialog was found and handled
+ */
+function handleSessionTimeoutDialog() {
+  return new Promise((resolve) => {
+    // Look for the modal with "Are you still there?" title
+    const modalTitle = document.querySelector('[data-test-component="StencilModalTitle"]');
+    if (!modalTitle || !modalTitle.textContent.includes('Are you still there?')) {
+      resolve(false);
+      return;
+    }
+
+    console.log('[A-to-Z Auto] Session timeout dialog detected');
+
+    // Find the "Stay logged in" button
+    const modal = modalTitle.closest('[data-test-component="StencilModal"]');
+    if (!modal) {
+      resolve(false);
+      return;
+    }
+
+    const buttons = modal.querySelectorAll('[data-test-component="StencilReactButton"]');
+    let stayLoggedInButton = null;
+
+    for (const btn of buttons) {
+      if (btn.textContent.includes('Stay logged in')) {
+        stayLoggedInButton = btn;
+        break;
+      }
+    }
+
+    if (!stayLoggedInButton) {
+      console.log('[A-to-Z Auto] Could not find "Stay logged in" button');
+      resolve(false);
+      return;
+    }
+
+    console.log('[A-to-Z Auto] Clicking "Stay logged in" button...');
+    stayLoggedInButton.click();
+
+    // Wait for dialog to disappear
+    let attempts = 0;
+    const maxAttempts = 20; // 10 seconds max
+
+    const checkInterval = setInterval(() => {
+      attempts++;
+      const dialogStillExists = document.querySelector('[data-test-component="StencilModalTitle"]');
+
+      if (!dialogStillExists || !dialogStillExists.textContent.includes('Are you still there?')) {
+        clearInterval(checkInterval);
+        console.log('[A-to-Z Auto] Session timeout dialog dismissed');
+        resolve(true);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(checkInterval);
+        console.log('[A-to-Z Auto] Timeout waiting for dialog to close');
+        resolve(false);
+      }
+    }, 500);
+  });
+}
+
+/**
+ * Set up MutationObserver to watch for session timeout dialog
+ */
+function setupSessionKeepAlive() {
+  if (sessionKeepAliveObserver) {
+    return; // Already set up
+  }
+
+  console.log('[A-to-Z Auto] Setting up session keep-alive observer');
+
+  sessionKeepAliveObserver = new MutationObserver(async (mutations) => {
+    // Check if any mutation added nodes that might be the dialog
+    for (const mutation of mutations) {
+      if (mutation.addedNodes.length > 0) {
+        // Check if the session timeout dialog appeared
+        const modalTitle = document.querySelector('[data-test-component="StencilModalTitle"]');
+        if (modalTitle && modalTitle.textContent.includes('Are you still there?')) {
+          await handleSessionTimeoutDialog();
+          break;
+        }
+      }
+    }
+  });
+
+  // Observe the entire document for added nodes
+  sessionKeepAliveObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  // Also check immediately in case dialog is already present
+  handleSessionTimeoutDialog();
+}
 
 function getPageType() {
   const url = window.location.href;
@@ -203,15 +301,78 @@ function findMatchingVtoSlot() {
 }
 
 /**
- * Check if the confirmation dialog is open and click Accept VTO
- * @returns {boolean} True if dialog was found and clicked
+ * Wait for the dialog to update with success or failure message
  */
-function handleConfirmationDialog() {
+function waitForAcceptanceResult() {
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const maxAttempts = 20; // 10 seconds (500ms * 20)
+
+    const interval = setInterval(() => {
+      attempts++;
+
+      // Look for the modal body content
+      const modalBody = document.querySelector('[data-test-component="StencilModalBody"]');
+      if (!modalBody) {
+        // If modal closed unexpectedly, maybe success? But usually it stays open with message.
+        // Or if we can't find it, we stop trying after timeout
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          resolve({ status: 'unknown', message: 'Modal closed or not found' });
+        }
+        return;
+      }
+
+      const text = modalBody.innerText || modalBody.textContent;
+
+      // Check for Success
+      if (text.includes('successfully accepted') || text.includes('Successfully accepted')) {
+        clearInterval(interval);
+        resolve({ status: 'success' });
+      }
+
+      // Check for Failure
+      else if (text.includes('Something went wrong') || text.includes('Full') || text.includes('full')) {
+        clearInterval(interval);
+        resolve({ status: 'failure', message: text });
+      }
+
+      // Timeout
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        resolve({ status: 'timeout' });
+      }
+    }, 500);
+  });
+}
+
+/**
+ * Check if the confirmation dialog is open and click Accept VTO
+ * @returns {Promise<boolean>} True if dialog was found and clicked
+ */
+async function handleConfirmationDialog() {
   const confirmButton = document.querySelector('button[data-test-id="VtoSummaryModal_acceptButton"]');
+  // Only click if it's visible and not disabled? (Usually always enabled)
   if (confirmButton) {
     console.log('[A-to-Z Auto] Clicking confirmation dialog Accept VTO button...');
     confirmButton.click();
-    return true;
+
+    // Now wait for the result
+    console.log('[A-to-Z Auto] Waiting for acceptance result...');
+    const result = await waitForAcceptanceResult();
+
+    if (result.status === 'success') {
+      console.log('[A-to-Z Auto] Success detected!');
+      return true;
+    } else {
+      console.log('[A-to-Z Auto] Failure or Unknown:', result);
+      // Throw error or return false to indicate we shouldn't remove the item?
+      // We should return false so the main loop stops but doesn't remove the item.
+      if (result.status === 'failure') {
+        alert('VTO Acceptance Failed: ' + (result.message || 'Unknown error'));
+      }
+      return false;
+    }
   }
   return false;
 }
@@ -250,15 +411,22 @@ async function removeAcceptedTarget() {
   }
 }
 
-function checkAndClick() {
+async function checkAndClick() {
   if (!isRunning) return;
 
   // First check if confirmation dialog is open
-  if (handleConfirmationDialog()) {
-    console.log('[A-to-Z Auto] VTO accepted! Stopping automation and cleaning up...');
-    removeAcceptedTarget().then(() => {
+  // This is now async
+  const confirmButton = document.querySelector('button[data-test-id="VtoSummaryModal_acceptButton"]');
+  if (confirmButton) {
+    const success = await handleConfirmationDialog();
+    if (success) {
+      console.log('[A-to-Z Auto] VTO accepted! Stopping automation and cleaning up...');
+      await removeAcceptedTarget();
       stopAutomation();
-    });
+    } else {
+      console.log('[A-to-Z Auto] VTO acceptance failed or timed out. Stopping automation.');
+      stopAutomation();
+    }
     return;
   }
 
@@ -273,13 +441,47 @@ function checkAndClick() {
     setTimeout(() => checkAndClick(), 500);
   } else {
     // No match found, refresh immediately
-    console.log('[A-to-Z Auto] No matching VTO found, refreshing...');
-    window.location.reload();
+    // No match found
+    console.log('[A-to-Z Auto] No matching VTO found');
+
+    const now = Date.now();
+    const CYCLE_DURATION = 80000; // 1m 20s
+    const PAUSE_DURATION = 5000; // 5s
+
+    if (!config.cycleStartTime) {
+      config.cycleStartTime = now;
+      saveConfig();
+    }
+
+    const elapsed = now - config.cycleStartTime;
+
+    if (elapsed >= CYCLE_DURATION) {
+      console.log(`[A-to-Z Auto] Cycle complete (${elapsed}ms). Pausing for ${PAUSE_DURATION}ms...`);
+
+      // Reset cycle start time for the next run (start counting after the pause)
+      config.cycleStartTime = now + PAUSE_DURATION;
+      saveConfig().then(() => {
+        setTimeout(() => {
+          console.log('[A-to-Z Auto] Pause complete. Refreshing...');
+          window.location.reload();
+        }, PAUSE_DURATION);
+      });
+    } else {
+      // Normal refresh
+      console.log(`[A-to-Z Auto] Cycle active (${elapsed}ms). Refreshing immediately...`);
+      window.location.reload();
+    }
   }
 }
 
 function startAutomation(newConfig) {
   config = newConfig;
+
+  // Initialize cycle start time if not present (fresh start)
+  if (!config.cycleStartTime) {
+    config.cycleStartTime = Date.now();
+  }
+
   isRunning = true;
   currentTargetIndex = -1;
 
@@ -288,6 +490,22 @@ function startAutomation(newConfig) {
 
   const targetCount = config.targets?.length || 0;
   console.log(`[A-to-Z Auto] Started - watching ${targetCount} VTO target(s)`);
+}
+
+async function saveConfig() {
+  if (!config) return;
+  const pageType = getPageType();
+  if (!pageType) return;
+
+  try {
+    const result = await chrome.storage.local.get(pageType);
+    const existing = result[pageType] || {};
+    await chrome.storage.local.set({
+      [pageType]: { ...existing, ...config }
+    });
+  } catch (err) {
+    console.error('[A-to-Z Auto] Error saving config:', err);
+  }
 }
 
 function stopAutomation() {
@@ -312,6 +530,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'stop') {
     stopAutomation();
     sendResponse({ success: true });
+  } else if (message.action === 'refresh') {
+    console.log('[A-to-Z Auto] Received refresh command from background script');
+    window.location.reload();
+    sendResponse({ success: true });
   }
   return true;
 });
@@ -329,5 +551,9 @@ async function restoreState() {
     startAutomation(savedConfig);
   }
 }
+
+// Initialize session keep-alive observer immediately
+// This runs regardless of automation state to prevent unexpected logouts
+setupSessionKeepAlive();
 
 setTimeout(() => restoreState(), 1000);
