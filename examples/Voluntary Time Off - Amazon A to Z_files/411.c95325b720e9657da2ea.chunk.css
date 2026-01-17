@@ -1,0 +1,2 @@
+div.section{margin-bottom:30px;opacity:1}div.section:first-of-type{margin-top:30px}div.section.hidden{opacity:0}div.section:not(.hidden){animation-duration:1s;animation-name:fadeIn}.foo{flex:1 1}@keyframes fadeIn{0%{opacity:0}to{opacity:1}}.float-right{float:right}
+/*# sourceMappingURL=411.c95325b720e9657da2ea.chunk.css.map*/
