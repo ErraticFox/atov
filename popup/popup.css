@@ -142,6 +142,24 @@ h2 {
   color: #b07070;
 }
 
+.btn-primary {
+  background: #2e7d32;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #388e3c;
+}
+
+.btn-secondary {
+  background: #424242;
+  color: #adb5bd;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #4c4c4c;
+}
+
 .message {
   text-align: center;
   color: #808080;

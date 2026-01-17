@@ -5,9 +5,16 @@ const REFRESH_INTERVAL_MINUTES = 0.5;
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === REFRESH_ALARM_NAME) {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab && tab.url && tab.url.includes('atoz.amazon.work')) {
-      chrome.tabs.sendMessage(tab.id, { action: 'refresh' });
+    const tabs = await chrome.tabs.query({ url: '*://atoz.amazon.work/*' });
+    for (const tab of tabs) {
+      if (tab.id) {
+        try {
+          chrome.tabs.sendMessage(tab.id, { action: 'refresh' });
+        } catch (err) {
+          // Tab might be closed or not ready
+          console.debug('Failed to send refresh to tab', tab.id, err);
+        }
+      }
     }
   }
 });

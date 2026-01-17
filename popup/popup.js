@@ -7,6 +7,22 @@ const PageType = {
 };
 
 let vtoTargets = [];
+let timerInterval = null;
+
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const pad = (n) => n.toString().padStart(2, '0');
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
+}
+
+let currentCycleStartTime = null;
 
 function detectPageType(url) {
   if (!url) return PageType.UNKNOWN;
@@ -29,16 +45,41 @@ function showSection(pageType) {
   }
 }
 
-function updateStatus(pageType, isRunning, statusInfo = '') {
+function updateStatus(pageType, isRunning, statusInfo = '', cycleStartTime = null) {
   const statusEl = document.getElementById(`${pageType}-status`);
   const startBtn = document.getElementById(`${pageType}-start`);
   const stopBtn = document.getElementById(`${pageType}-stop`);
 
+  currentCycleStartTime = cycleStartTime;
+
+  // Clear existing interval
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
   if (isRunning) {
-    statusEl.textContent = `Running... Watching ${statusInfo}`;
     statusEl.className = 'status running';
     startBtn.disabled = true;
     stopBtn.disabled = false;
+
+    const updateText = () => {
+      let timeStr = '';
+      if (currentCycleStartTime) {
+        const elapsed = Date.now() - currentCycleStartTime;
+        if (elapsed >= 0) {
+          timeStr = ` (${formatDuration(elapsed)})`;
+        } else {
+          timeStr = ` (Paused ${formatDuration(Math.abs(elapsed))})`;
+        }
+      }
+      statusEl.textContent = `Running... Watching ${statusInfo}${timeStr}`;
+    };
+
+    updateText();
+    if (cycleStartTime) {
+      timerInterval = setInterval(updateText, 1000);
+    }
   } else {
     statusEl.textContent = 'Stopped';
     statusEl.className = 'status stopped';
@@ -289,15 +330,21 @@ async function startAutomation(pageType) {
       pageType: pageType,
       targets: resolvedTargets,
       shiftTime: shiftTime,
-      isRunning: true
+      isRunning: true,
+      cycleStartTime: Date.now()
     };
 
     await chrome.storage.local.set({ [pageType]: config });
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+    try {
+      await chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+    } catch (err) {
+      alert('Cannot connect to the page. Please refresh the page and try again.');
+      return;
+    }
 
-    updateStatus(pageType, true, `${resolvedTargets.length} target(s)`);
+    updateStatus(pageType, true, `${resolvedTargets.length} target(s)`, config.cycleStartTime);
   } else {
     const dateInput = document.getElementById(`${pageType}-date`);
     const timeInput = document.getElementById(`${pageType}-time`);
@@ -306,15 +353,21 @@ async function startAutomation(pageType) {
       pageType: pageType,
       date: dateInput.value,
       time: timeInput.value,
-      isRunning: true
+      isRunning: true,
+      cycleStartTime: Date.now()
     };
 
     await chrome.storage.local.set({ [pageType]: config });
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+    try {
+      await chrome.tabs.sendMessage(tab.id, { action: 'start', config: config });
+    } catch (err) {
+      alert('Cannot connect to the page. Please refresh the page and try again.');
+      return;
+    }
 
-    updateStatus(pageType, true, 1);
+    updateStatus(pageType, true, 1, config.cycleStartTime);
   }
 }
 
@@ -326,7 +379,11 @@ async function stopAutomation(pageType) {
   });
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  chrome.tabs.sendMessage(tab.id, { action: 'stop' });
+  try {
+    await chrome.tabs.sendMessage(tab.id, { action: 'stop' });
+  } catch (err) {
+    console.warn('Could not send stop message (tab might be closed/disconnected)', err);
+  }
 
   updateStatus(pageType, false);
 }
@@ -350,7 +407,7 @@ async function loadSavedState(pageType) {
       }
 
       if (config.isRunning) {
-        updateStatus(pageType, true, `${config.targets?.length || 0} target(s)`);
+        updateStatus(pageType, true, `${config.targets?.length || 0} target(s)`, config.cycleStartTime);
       }
     } else {
       if (config.date) {
@@ -360,7 +417,7 @@ async function loadSavedState(pageType) {
         document.getElementById(`${pageType}-time`).value = config.time;
       }
       if (config.isRunning) {
-        updateStatus(pageType, true, 1);
+        updateStatus(pageType, true, 1, config.cycleStartTime);
       }
     }
   }
@@ -385,6 +442,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Always init form listeners for VTO (so they work if the section is shown)
   if (pageType === PageType.VTO) {
     initFormListeners();
+  } else if (pageType === PageType.UNKNOWN) {
+    const navVtoBtn = document.getElementById('nav-vto');
+    if (navVtoBtn) {
+      navVtoBtn.addEventListener('click', () => {
+        chrome.tabs.update({ url: 'https://atoz.amazon.work/voluntary_time_off' });
+      });
+    }
   }
 
   // Event listeners
@@ -401,4 +465,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('vto-stop').addEventListener('click', () => stopAutomation(PageType.VTO));
   document.getElementById('vet-start').addEventListener('click', () => startAutomation(PageType.VET));
   document.getElementById('vet-stop').addEventListener('click', () => stopAutomation(PageType.VET));
+});
+
+// Listen for storage changes to sync timer if cycle resets
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local') {
+    // Check if VTO config changed
+    if (changes.vto && changes.vto.newValue) {
+      const newConfig = changes.vto.newValue;
+      // If it's running and cycleStartTime changed, update the timer
+      if (newConfig.isRunning && newConfig.cycleStartTime && newConfig.cycleStartTime !== currentCycleStartTime) {
+        updateStatus(PageType.VTO, true, `${newConfig.targets?.length || 0} target(s)`, newConfig.cycleStartTime);
+      }
+      // If it stopped running
+      if (!newConfig.isRunning && changes.vto.oldValue?.isRunning) {
+        updateStatus(PageType.VTO, false);
+      }
+    }
+  }
 });
