@@ -1,5 +1,5 @@
 {
-  "name": "atoz-auto",
+  "name": "atov",
   "version": "1.0.0",
   "description": "Chrome extension for automating VTO and VET on Amazon A-to-Z portal",
   "scripts": {

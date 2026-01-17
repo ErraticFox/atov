@@ -18,7 +18,7 @@ function handleSessionTimeoutDialog() {
       return;
     }
 
-    console.log('[A-to-Z Auto] Session timeout dialog detected');
+    console.log('[AtoV] Session timeout dialog detected');
 
     // Find the "Stay logged in" button
     const modal = modalTitle.closest('[data-test-component="StencilModal"]');
@@ -38,12 +38,12 @@ function handleSessionTimeoutDialog() {
     }
 
     if (!stayLoggedInButton) {
-      console.log('[A-to-Z Auto] Could not find "Stay logged in" button');
+      console.log('[AtoV] Could not find "Stay logged in" button');
       resolve(false);
       return;
     }
 
-    console.log('[A-to-Z Auto] Clicking "Stay logged in" button...');
+    console.log('[AtoV] Clicking "Stay logged in" button...');
     stayLoggedInButton.click();
 
     // Wait for dialog to disappear
@@ -56,11 +56,11 @@ function handleSessionTimeoutDialog() {
 
       if (!dialogStillExists || !dialogStillExists.textContent.includes('Are you still there?')) {
         clearInterval(checkInterval);
-        console.log('[A-to-Z Auto] Session timeout dialog dismissed');
+        console.log('[AtoV] Session timeout dialog dismissed');
         resolve(true);
       } else if (attempts >= maxAttempts) {
         clearInterval(checkInterval);
-        console.log('[A-to-Z Auto] Timeout waiting for dialog to close');
+        console.log('[AtoV] Timeout waiting for dialog to close');
         resolve(false);
       }
     }, 500);
@@ -75,7 +75,7 @@ function setupSessionKeepAlive() {
     return; // Already set up
   }
 
-  console.log('[A-to-Z Auto] Setting up session keep-alive observer');
+  console.log('[AtoV] Setting up session keep-alive observer');
 
   sessionKeepAliveObserver = new MutationObserver(async (mutations) => {
     // Check if any mutation added nodes that might be the dialog
@@ -277,7 +277,7 @@ function findMatchingVtoSlot() {
           if (isWithinShiftAndMinDuration(timeRange, config.shiftTime, target.minDuration || 0)) {
             const acceptButton = card.querySelector('button[aria-label^="Accept"]');
             if (acceptButton) {
-              console.log('[A-to-Z Auto] Accept Any - Found VTO:', dateText, timeRange);
+              console.log('[AtoV] Accept Any - Found VTO:', dateText, timeRange);
               return { element: acceptButton, targetIndex: i };
             }
           }
@@ -286,10 +286,10 @@ function findMatchingVtoSlot() {
           if (matchesTimeRange(timeRange, target.startTime, target.endTime)) {
             const acceptButton = card.querySelector('button[aria-label^="Accept"]');
             if (acceptButton) {
-              console.log('[A-to-Z Auto] Found matching VTO:', dateText, timeRange);
+              console.log('[AtoV] Found matching VTO:', dateText, timeRange);
               return { element: acceptButton, targetIndex: i };
             } else {
-              console.log('[A-to-Z Auto] Found matching slot but no accept button:', dateText, timeRange);
+              console.log('[AtoV] Found matching slot but no accept button:', dateText, timeRange);
             }
           }
         }
@@ -354,18 +354,18 @@ async function handleConfirmationDialog() {
   const confirmButton = document.querySelector('button[data-test-id="VtoSummaryModal_acceptButton"]');
   // Only click if it's visible and not disabled? (Usually always enabled)
   if (confirmButton) {
-    console.log('[A-to-Z Auto] Clicking confirmation dialog Accept VTO button...');
+    console.log('[AtoV] Clicking confirmation dialog Accept VTO button...');
     confirmButton.click();
 
     // Now wait for the result
-    console.log('[A-to-Z Auto] Waiting for acceptance result...');
+    console.log('[AtoV] Waiting for acceptance result...');
     const result = await waitForAcceptanceResult();
 
     if (result.status === 'success') {
-      console.log('[A-to-Z Auto] Success detected!');
+      console.log('[AtoV] Success detected!');
       return true;
     } else {
-      console.log('[A-to-Z Auto] Failure or Unknown:', result);
+      console.log('[AtoV] Failure or Unknown:', result);
       // Throw error or return false to indicate we shouldn't remove the item?
       // We should return false so the main loop stops but doesn't remove the item.
       if (result.status === 'failure') {
@@ -389,7 +389,7 @@ async function removeAcceptedTarget() {
     // config.targets was a snapshot or mapped version.
     // We assume index alignment.
     if (vtoData.targets && vtoData.targets.length > currentTargetIndex) {
-      console.log(`[A-to-Z Auto] Removing accepted target at index ${currentTargetIndex}`);
+      console.log(`[AtoV] Removing accepted target at index ${currentTargetIndex}`);
       vtoData.targets.splice(currentTargetIndex, 1);
 
       // Update config to match (and stop it)
@@ -404,10 +404,10 @@ async function removeAcceptedTarget() {
         vto: { ...vtoData, targets: vtoData.targets, isRunning: false }
       });
 
-      console.log('[A-to-Z Auto] Target removed and storage updated.');
+      console.log('[AtoV] Target removed and storage updated.');
     }
   } catch (err) {
-    console.error('[A-to-Z Auto] Error removing accepted target:', err);
+    console.error('[AtoV] Error removing accepted target:', err);
   }
 }
 
@@ -420,11 +420,11 @@ async function checkAndClick() {
   if (confirmButton) {
     const success = await handleConfirmationDialog();
     if (success) {
-      console.log('[A-to-Z Auto] VTO accepted! Stopping automation and cleaning up...');
+      console.log('[AtoV] VTO accepted! Stopping automation and cleaning up...');
       await removeAcceptedTarget();
       stopAutomation();
     } else {
-      console.log('[A-to-Z Auto] VTO acceptance failed or timed out. Stopping automation.');
+      console.log('[AtoV] VTO acceptance failed or timed out. Stopping automation.');
       stopAutomation();
     }
     return;
@@ -434,7 +434,7 @@ async function checkAndClick() {
   const match = findMatchingVtoSlot();
 
   if (match) {
-    console.log('[A-to-Z Auto] Clicking Accept on matching VTO slot...');
+    console.log('[AtoV] Clicking Accept on matching VTO slot...');
     currentTargetIndex = match.targetIndex;
     match.element.click();
     // Wait for dialog to appear, then check again
@@ -442,7 +442,7 @@ async function checkAndClick() {
   } else {
     // No match found, refresh immediately
     // No match found
-    console.log('[A-to-Z Auto] No matching VTO found');
+    console.log('[AtoV] No matching VTO found');
 
     const now = Date.now();
     const CYCLE_DURATION = 80000; // 1m 20s
@@ -456,19 +456,19 @@ async function checkAndClick() {
     const elapsed = now - config.cycleStartTime;
 
     if (elapsed >= CYCLE_DURATION) {
-      console.log(`[A-to-Z Auto] Cycle complete (${elapsed}ms). Pausing for ${PAUSE_DURATION}ms...`);
+      console.log(`[AtoV] Cycle complete (${elapsed}ms). Pausing for ${PAUSE_DURATION}ms...`);
 
       // Reset cycle start time for the next run (start counting after the pause)
       config.cycleStartTime = now + PAUSE_DURATION;
       saveConfig().then(() => {
         setTimeout(() => {
-          console.log('[A-to-Z Auto] Pause complete. Refreshing...');
+          console.log('[AtoV] Pause complete. Refreshing...');
           window.location.reload();
         }, PAUSE_DURATION);
       });
     } else {
       // Normal refresh
-      console.log(`[A-to-Z Auto] Cycle active (${elapsed}ms). Refreshing immediately...`);
+      console.log(`[AtoV] Cycle active (${elapsed}ms). Refreshing immediately...`);
       window.location.reload();
     }
   }
@@ -489,7 +489,7 @@ function startAutomation(newConfig) {
   checkAndClick();
 
   const targetCount = config.targets?.length || 0;
-  console.log(`[A-to-Z Auto] Started - watching ${targetCount} VTO target(s)`);
+  console.log(`[AtoV] Started - watching ${targetCount} VTO target(s)`);
 }
 
 async function saveConfig() {
@@ -504,14 +504,14 @@ async function saveConfig() {
       [pageType]: { ...existing, ...config }
     });
   } catch (err) {
-    console.error('[A-to-Z Auto] Error saving config:', err);
+    console.error('[AtoV] Error saving config:', err);
   }
 }
 
 function stopAutomation() {
   isRunning = false;
   config = null;
-  console.log('[A-to-Z Auto] Stopped');
+  console.log('[AtoV] Stopped');
 
   // Ensure we mark as stopped in storage so popup reflects it immediately if verified
   chrome.storage.local.get(['vto', 'vet'], (result) => {
@@ -531,7 +531,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     stopAutomation();
     sendResponse({ success: true });
   } else if (message.action === 'refresh') {
-    console.log('[A-to-Z Auto] Received refresh command from background script');
+    console.log('[AtoV] Received refresh command from background script');
     window.location.reload();
     sendResponse({ success: true });
   }
@@ -547,7 +547,7 @@ async function restoreState() {
   const savedConfig = result[pageType];
 
   if (savedConfig && savedConfig.isRunning) {
-    console.log('[A-to-Z Auto] Restoring automation...');
+    console.log('[AtoV] Restoring automation...');
     startAutomation(savedConfig);
   }
 }

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "A-to-Z Auto",
+  "name": "AtoV",
   "version": "1.0.0",
   "description": "Automate VTO and VET interactions on Amazon A-to-Z portal",
   "permissions": [

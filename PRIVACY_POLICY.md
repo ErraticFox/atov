@@ -1,9 +1,9 @@
-# Privacy Policy for A-to-Z Auto
+# Privacy Policy for AtoV
 
 **Last Updated:** January 17, 2026
 
 ## Introduction
-A-to-Z Auto ("we", "our", or "the extension") is a browser extension designed to help users automate interactions with the Amazon A-to-Z employee portal. We define "user" as any individual using this extension.
+AtoV ("we", "our", or "the extension") is a browser extension designed to help users automate interactions with the Amazon A-to-Z employee portal. We define "user" as any individual using this extension.
 
 ## Data Collection and Usage
 **We do not collect, transmit, or sell any of your personal data.**

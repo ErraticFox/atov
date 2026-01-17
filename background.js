@@ -34,5 +34,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('A-to-Z Auto extension installed');
+  console.log('AtoV extension installed');
 });
